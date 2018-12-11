@@ -24,9 +24,14 @@ public class ForkJoinSolver
      *
      * @param maze   the maze to be searched
      */
+
+    private volatile boolean completed = false;
+    private static Set<Integer> lockalVisited= new ConcurrentSkipListSet<>();
+
     public ForkJoinSolver(Maze maze)
     {
         super(maze);
+        super.visited = lockalVisited;
 //        this.previousPath = new ArrayList<>();
     }
 
@@ -38,7 +43,8 @@ public class ForkJoinSolver
 //                          List<Integer> previousPath,
                           int start) {
         super(maze);
-        super.visited = visited;
+        super.visited = lockalVisited;
+//        super.visited = visited;
 //        super.predecessor = predecessor;
 //        this.previousPath = previousPath;
         super.start = start;
@@ -85,7 +91,7 @@ public class ForkJoinSolver
             // start with start node
             frontier.push(start);
             // as long as not all nodes have been processed
-            while (!frontier.empty()) {
+            while (!frontier.empty() && !completed) {
                 // get the new node to process
                 int current = frontier.pop();
                 // if current node has a goal
@@ -94,6 +100,7 @@ public class ForkJoinSolver
                     maze.move(player, current);
                     // search finished: reconstruct and return path
 //                    System.out.println("OK" + String.valueOf(pathFromTo(start, current).size()));
+                    completed=true;
                     return pathFromTo(start, current);
                 }
                 // if current node has not been visited yet
@@ -107,6 +114,7 @@ public class ForkJoinSolver
                     if (neighbours.size()<=2) {
                         for (int nb : neighbours) {
                             // add nb to the nodes to be processed
+                            if (visited.contains(nb)) continue;
                             frontier.push(nb);
                             // if nb has not been already visited,
                             // nb can be reached from current (i.e., current is nb's predecessor)
@@ -118,9 +126,8 @@ public class ForkJoinSolver
                         List<ForkJoinSolver> forkJoinSolvers = new ArrayList<>();
                         List<Integer> prevP = pathFromTo(start, current);
                         for (int nb : neighbours) {
-//                            (new ForkJoinSolver(maze, visited, nb)).fork();
                             if (visited.contains(nb)) continue;
-                            ForkJoinSolver tmp = new ForkJoinSolver(maze, visited, /*prevP,*/ nb);
+                            ForkJoinSolver tmp = new ForkJoinSolver(maze, visited, nb);
                             forkJoinSolvers.add(tmp);
                             tmp.fork();
                         }
@@ -129,17 +136,11 @@ public class ForkJoinSolver
                             List<Integer> integers = task.join();
                             if(integers != null) {
                                 prevP.addAll(integers);
+                                completed = true;
                                 return prevP;
                             }
                         }
                         return null;
-
-//                        Collection<ForkJoinSolver> joinSolvers= invokeAll(forkJoinSolvers);
-//                        while (true) {
-//                            for (ForkJoinSolver fjs: forkJoinSolvers){
-//                                List<Integer> integers = fjs.join()
-//                            }
-//                        }
                     }
                 }
             }
@@ -148,12 +149,4 @@ public class ForkJoinSolver
         }
     }
 
-    @Override
-    public List<Integer> pathFromTo(int from, int to) {
-        List<Integer> p1 = super.pathFromTo(from, to);
-//        if (p1 == null) return null;
-//        this.previousPath.addAll(p1);
-//        return previousPath;
-        return p1;
-    }
 }
